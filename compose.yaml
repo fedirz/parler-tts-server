@@ -1,0 +1,24 @@
+services:
+  parler-tts-server:
+    image: fedirz/parler-tts-server
+    build:
+      dockerfile: Dockerfile
+      context: .
+      tags:
+        - fedirz/parler-tts-server
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    restart: unless-stopped
+    ports:
+      - 8000:8000
+    healthcheck:
+      test: curl --fail http://0.0.0.0:8000/health || exit 1
+      interval: 10s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: ["gpu"]
