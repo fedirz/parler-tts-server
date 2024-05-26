@@ -51,6 +51,7 @@ response.stream_to_file(speech_file_path)
 - Add GitHub Actions for building and publishing the Docker image
 - Provide a smaller Docker image for CPU only inference
 - Add ARM support 
+- Add streaming support
 - Maybe: merge into [Parler-TTS](https://github.com/huggingface/parler-tts)
 
 ## Citations
