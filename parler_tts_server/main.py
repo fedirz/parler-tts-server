@@ -1,7 +1,7 @@
 import logging
 import time
 from contextlib import asynccontextmanager
-from typing import Annotated
+from typing import Annotated, Any
 
 import soundfile as sf
 import torch
@@ -25,8 +25,6 @@ class Config(BaseSettings):
 
 
 config = Config()
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.CRITICAL)
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level.upper())
 
@@ -40,12 +38,12 @@ else:
 torch_dtype = torch.float16 if device != "cpu" else torch.float32
 
 tts: ParlerTTSForConditionalGeneration = None  # type: ignore
+tokenizer: Any = None
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    global tts
-    torch_dtype = torch.float16 if device != "cpu" else torch.float32
+    global tts, tokenizer
     logging.debug(f"Loading {config.model}")
     start = time.perf_counter()
     tts = ParlerTTSForConditionalGeneration.from_pretrained(
@@ -53,8 +51,9 @@ async def lifespan(_: FastAPI):
     ).to(  # type: ignore
         device, dtype=torch_dtype  # type: ignore
     )
+    tokenizer = AutoTokenizer.from_pretrained(config.model)
     logger.info(
-        f"Loaded {config.model} loaded in {time.perf_counter() - start:.2f} seconds"
+        f"Loaded {config.model} and tokenizer in {time.perf_counter() - start:.2f} seconds"
     )
     yield
 
@@ -85,7 +84,6 @@ async def generate_audio(
             f"Specifying speed isn't supported by {config.model}. Using default speed: {SPEED}."
         )
     start = time.perf_counter()
-    tokenizer = AutoTokenizer.from_pretrained(config.model)
     input_ids = tokenizer(voice, return_tensors="pt").input_ids.to(device)
     prompt_input_ids = tokenizer(input, return_tensors="pt").input_ids.to(device)
     generation = tts.generate(
