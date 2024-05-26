@@ -35,16 +35,17 @@ curl -s -H "content-type: application/json" localhost:8000/v1/audio/speech -d '{
 ```
 Using `openai` should also work although haven't tested it yet - https://platform.openai.com/docs/guides/speech-to-text/speech-to-text
 ```python
+from pathlib import Path
 from openai import OpenAI
 client = OpenAI()
 
-audio_file= open("/path/to/file/audio.mp3", "rb")
-transcription = client.audio.transcriptions.create(
-  model="parler-tts/parler_tts_mini_v0.1", # default model name
-  file=audio_file
+speech_file_path = Path(__file__).parent / "speech.mp3"
+response = client.audio.speech.create(
+  model="parler-tts/parler_tts_mini_v0.1", # this is the name of the default model
+  input="Today is a wonderful day to build something people love!"
 )
-print(transcription.text)
 
+response.stream_to_file(speech_file_path)
 ```
 ## Roadmap
 - Add GitHub Actions for building and publishing the Docker image
