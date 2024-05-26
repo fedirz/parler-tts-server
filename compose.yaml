@@ -6,6 +6,10 @@ services:
       context: .
       tags:
         - fedirz/parler-tts-server
+    develop:
+      watch:
+        - path: ./parler_tts_server
+          action: rebuild
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
     restart: unless-stopped
