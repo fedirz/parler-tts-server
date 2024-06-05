@@ -16,17 +16,14 @@ from transformers import AutoTokenizer
 
 from parler_tts_server.logger import logger
 
-MODEL = "parler-tts/parler_tts_mini_v0.1"
-VOICE = "A female speaker with a slightly low-pitched voice delivers her words quite expressively, in a very confined sounding environment with clear audio quality. She speaks very fast."
-RESPONSE_FORMAT = "mp3"
 SPEED = 1.0
 
 
 class Config(BaseSettings):
     log_level: str = "info"  # env: LOG_LEVEL
-    model: str = MODEL  # env: MODEL
-    voice: str = VOICE  # env: VOICE
-    response_format: str = RESPONSE_FORMAT  # env: RESPONSE_FORMAT
+    model: str = "parler-tts/parler-tts-mini-expresso"  # env: MODEL
+    voice: str = "Thomas speaks moderately slowly in a sad tone with emphasis and high quality audio."  # env: VOICE
+    response_format: str = "mp3"  # env: RESPONSE_FORMAT
 
 
 config = Config()
@@ -139,6 +136,7 @@ async def generate_audio(
     logger.info(
         f"Took {time.perf_counter() - start:.2f} seconds to generate audio for {len(input.split())} words using {device.upper()}"
     )
+    # TODO: verify support for: mp3, opus, aac, flac, wav, and pcm
     # TODO: use an in-memory file instead of writing to disk
     sf.write(f"out.{response_format}", audio_arr, tts.config.sampling_rate)
     return FileResponse(f"out.{response_format}", media_type=f"audio/{response_format}")
