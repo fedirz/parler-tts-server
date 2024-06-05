@@ -1,3 +1,5 @@
 fastapi~=0.111.0
 uvicorn~=0.29.0
 pydantic-settings~=2.2.1
+huggingface-hub==0.23.1
+openai==1.31.0

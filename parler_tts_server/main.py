@@ -3,10 +3,13 @@ import time
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
+import huggingface_hub
 import soundfile as sf
 import torch
-from fastapi import Body, FastAPI, Response
+from fastapi import Body, FastAPI, HTTPException, Response
 from fastapi.responses import FileResponse
+from huggingface_hub.hf_api import ModelInfo
+from openai.types import Model
 from parler_tts import ParlerTTSForConditionalGeneration
 from pydantic_settings import BaseSettings
 from transformers import AutoTokenizer
@@ -65,6 +68,46 @@ app = FastAPI(lifespan=lifespan)
 @app.get("/health")
 def health() -> Response:
     return Response(status_code=200, content="OK")
+
+
+@app.get("/v1/models", response_model=list[Model])
+def get_models() -> list[Model]:
+    models = list(huggingface_hub.list_models(model_name="parler-tts"))
+    models = [
+        Model(
+            id=model.id,
+            created=int(model.created_at.timestamp()),
+            object="model",
+            owned_by=model.id.split("/")[0],
+        )
+        for model in models
+        if model.created_at is not None
+    ]
+    return models
+
+
+@app.get("/v1/models/{model_name:path}", response_model=Model)
+def get_model(model_name: str) -> Model:
+    models = list(huggingface_hub.list_models(model_name=model_name))
+    if len(models) == 0:
+        raise HTTPException(status_code=404, detail="Model doesn't exists")
+    exact_match: ModelInfo | None = None
+    for model in models:
+        if model.id == model_name:
+            exact_match = model
+            break
+    if exact_match is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Model doesn't exists. Possible matches: {", ".join([model.id for model in models])}",
+        )
+    assert exact_match.created_at is not None
+    return Model(
+        id=exact_match.id,
+        created=int(exact_match.created_at.timestamp()),
+        object="model",
+        owned_by=exact_match.id.split("/")[0],
+    )
 
 
 # https://platform.openai.com/docs/api-reference/audio/createSpeech
