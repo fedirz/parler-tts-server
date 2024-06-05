@@ -11,6 +11,8 @@ from parler_tts import ParlerTTSForConditionalGeneration
 from pydantic_settings import BaseSettings
 from transformers import AutoTokenizer
 
+from parler_tts_server.logger import logger
+
 MODEL = "parler-tts/parler_tts_mini_v0.1"
 VOICE = "A female speaker with a slightly low-pitched voice delivers her words quite expressively, in a very confined sounding environment with clear audio quality. She speaks very fast."
 RESPONSE_FORMAT = "mp3"
@@ -25,16 +27,14 @@ class Config(BaseSettings):
 
 
 config = Config()
-logger = logging.getLogger(__name__)
-logger.setLevel(config.log_level.upper())
 
 # https://github.com/huggingface/parler-tts?tab=readme-ov-file#usage
 if torch.cuda.is_available():
     device = "cuda:0"
-    logging.info("GPU will be used for inference")
+    logger.info("GPU will be used for inference")
 else:
     device = "cpu"
-    logging.info("CPU will be used for inference")
+    logger.info("CPU will be used for inference")
 torch_dtype = torch.float16 if device != "cpu" else torch.float32
 
 tts: ParlerTTSForConditionalGeneration = None  # type: ignore
@@ -49,7 +49,8 @@ async def lifespan(_: FastAPI):
     tts = ParlerTTSForConditionalGeneration.from_pretrained(
         config.model,
     ).to(  # type: ignore
-        device, dtype=torch_dtype  # type: ignore
+        device,
+        dtype=torch_dtype,  # type: ignore
     )
     tokenizer = AutoTokenizer.from_pretrained(config.model)
     logger.info(

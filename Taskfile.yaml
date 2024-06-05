@@ -1,6 +1,6 @@
 version: "3"
 tasks:
-  server: poetry run uvicorn --host 0.0.0.0 --port 8000 parler_tts_server.main:app {{.CLI_ARGS}}
+  server: uvicorn --host 0.0.0.0 --port 8000 parler_tts_server.main:app {{.CLI_ARGS}}
   build-image:
     cmds:
       - docker compose build {{.CLI_ARGS}}
