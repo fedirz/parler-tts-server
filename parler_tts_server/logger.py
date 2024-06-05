@@ -22,7 +22,7 @@ logging_config = {
     },
     "loggers": {
         "root": {
-            "level": config.log_level,
+            "level": config.log_level.upper(),
             "handlers": ["stdout"],
         },
     },
