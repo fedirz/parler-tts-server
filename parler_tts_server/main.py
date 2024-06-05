@@ -1,7 +1,7 @@
-import logging
+import enum
 import time
 from contextlib import asynccontextmanager
-from typing import Annotated, Any
+from typing import Annotated, Any, OrderedDict
 
 import huggingface_hub
 import soundfile as sf
@@ -19,11 +19,23 @@ from parler_tts_server.logger import logger
 SPEED = 1.0
 
 
+# NOTE: commented out response formats don't work
+class ResponseFormat(enum.StrEnum):
+    MP3 = "mp3"
+    # OPUS = "opus"
+    # AAC = "aac"
+    FLAC = "flac"
+    WAV = "wav"
+    # PCM = "pcm"
+
+
 class Config(BaseSettings):
     log_level: str = "info"  # env: LOG_LEVEL
     model: str = "parler-tts/parler-tts-mini-expresso"  # env: MODEL
+    max_models: int = 1  # env: MAX_MODELS
+    lazy_load_model: bool = False  # env: LAZY_LOAD_MODEL
     voice: str = "Thomas speaks moderately slowly in a sad tone with emphasis and high quality audio."  # env: VOICE
-    response_format: str = "mp3"  # env: RESPONSE_FORMAT
+    response_format: ResponseFormat = ResponseFormat.MP3  # env: RESPONSE_FORMAT
 
 
 config = Config()
@@ -37,25 +49,47 @@ else:
     logger.info("CPU will be used for inference")
 torch_dtype = torch.float16 if device != "cpu" else torch.float32
 
-tts: ParlerTTSForConditionalGeneration = None  # type: ignore
-tokenizer: Any = None
+
+class ModelManager:
+    def __init__(self):
+        self.model_tokenizer: OrderedDict[
+            str, tuple[ParlerTTSForConditionalGeneration, AutoTokenizer]
+        ] = OrderedDict()
+
+    def load_model(
+        self, model_name: str
+    ) -> tuple[ParlerTTSForConditionalGeneration, AutoTokenizer]:
+        logger.debug(f"Loading {model_name}...")
+        start = time.perf_counter()
+        model = ParlerTTSForConditionalGeneration.from_pretrained(model_name).to(  # type: ignore
+            device,  # type: ignore
+            dtype=torch_dtype,
+        )
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        logger.info(
+            f"Loaded {model_name} and tokenizer in {time.perf_counter() - start:.2f} seconds"
+        )
+        return model, tokenizer
+
+    def get_or_load_model(
+        self, model_name: str
+    ) -> tuple[ParlerTTSForConditionalGeneration, Any]:
+        if model_name not in self.model_tokenizer:
+            logger.info(f"Model {model_name} isn't already loaded")
+            if len(self.model_tokenizer) == config.max_models:
+                logger.info("Unloading the oldest loaded model")
+                del self.model_tokenizer[next(iter(self.model_tokenizer))]
+            self.model_tokenizer[model_name] = self.load_model(model_name)
+        return self.model_tokenizer[model_name]
+
+
+model_manager = ModelManager()
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    global tts, tokenizer
-    logging.debug(f"Loading {config.model}")
-    start = time.perf_counter()
-    tts = ParlerTTSForConditionalGeneration.from_pretrained(
-        config.model,
-    ).to(  # type: ignore
-        device,
-        dtype=torch_dtype,  # type: ignore
-    )
-    tokenizer = AutoTokenizer.from_pretrained(config.model)
-    logger.info(
-        f"Loaded {config.model} and tokenizer in {time.perf_counter() - start:.2f} seconds"
-    )
+    if not config.lazy_load_model:
+        model_manager.get_or_load_model(config.model)
     yield
 
 
@@ -113,16 +147,13 @@ async def generate_audio(
     input: Annotated[str, Body()],
     voice: Annotated[str, Body()] = config.voice,
     model: Annotated[str, Body()] = config.model,
-    response_format: Annotated[str, Body()] = config.response_format,
+    response_format: Annotated[ResponseFormat, Body()] = config.response_format,
     speed: Annotated[float, Body()] = SPEED,
-):
-    if model != config.model:
-        logger.warning(
-            f"Specifying a model that is different from the default is not supported yet. Using default model: {config.model}."
-        )
+) -> FileResponse:
+    tts, tokenizer = model_manager.get_or_load_model(model)
     if speed != SPEED:
         logger.warning(
-            f"Specifying speed isn't supported by {config.model}. Using default speed: {SPEED}."
+            "Specifying speed isn't supported by this model. Audio will be generated with the default speed"
         )
     start = time.perf_counter()
     input_ids = tokenizer(voice, return_tensors="pt").input_ids.to(device)
@@ -136,7 +167,6 @@ async def generate_audio(
     logger.info(
         f"Took {time.perf_counter() - start:.2f} seconds to generate audio for {len(input.split())} words using {device.upper()}"
     )
-    # TODO: verify support for: mp3, opus, aac, flac, wav, and pcm
     # TODO: use an in-memory file instead of writing to disk
     sf.write(f"out.{response_format}", audio_arr, tts.config.sampling_rate)
     return FileResponse(f"out.{response_format}", media_type=f"audio/{response_format}")
