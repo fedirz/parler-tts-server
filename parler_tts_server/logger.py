@@ -1,8 +1,8 @@
 import logging
 import logging.config
-import os
 
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+from parler_tts_server.config import config
+
 logger = logging.getLogger("parler_tts_server")
 
 # https://www.youtube.com/watch?v=9L77QExPmI0
@@ -22,7 +22,7 @@ logging_config = {
     },
     "loggers": {
         "root": {
-            "level": LOG_LEVEL,
+            "level": config.log_level,
             "handlers": ["stdout"],
         },
     },

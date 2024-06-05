@@ -1,4 +1,3 @@
-import enum
 import time
 from contextlib import asynccontextmanager
 from typing import Annotated, Any, OrderedDict
@@ -11,34 +10,10 @@ from fastapi.responses import FileResponse
 from huggingface_hub.hf_api import ModelInfo
 from openai.types import Model
 from parler_tts import ParlerTTSForConditionalGeneration
-from pydantic_settings import BaseSettings
 from transformers import AutoTokenizer
 
+from parler_tts_server.config import SPEED, ResponseFormat, config
 from parler_tts_server.logger import logger
-
-SPEED = 1.0
-
-
-# NOTE: commented out response formats don't work
-class ResponseFormat(enum.StrEnum):
-    MP3 = "mp3"
-    # OPUS = "opus"
-    # AAC = "aac"
-    FLAC = "flac"
-    WAV = "wav"
-    # PCM = "pcm"
-
-
-class Config(BaseSettings):
-    log_level: str = "info"  # env: LOG_LEVEL
-    model: str = "parler-tts/parler-tts-mini-expresso"  # env: MODEL
-    max_models: int = 1  # env: MAX_MODELS
-    lazy_load_model: bool = False  # env: LAZY_LOAD_MODEL
-    voice: str = "Thomas speaks moderately slowly in a sad tone with emphasis and high quality audio."  # env: VOICE
-    response_format: ResponseFormat = ResponseFormat.MP3  # env: RESPONSE_FORMAT
-
-
-config = Config()
 
 # https://github.com/huggingface/parler-tts?tab=readme-ov-file#usage
 if torch.cuda.is_available():
