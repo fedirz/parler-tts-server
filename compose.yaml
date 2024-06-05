@@ -6,7 +6,6 @@ services:
       context: .
       platforms:
         - linux/amd64
-        - linux/arm64
       tags:
         - fedirz/parler-tts-server
     develop:
