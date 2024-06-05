@@ -20,7 +20,7 @@
               ffmpeg-full
               go-task
               lsyncd
-              python311
+              python312
             ];
             shellHook = ''
               source venv/bin/activate
